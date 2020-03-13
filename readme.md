@@ -7,8 +7,7 @@
 
 # 解决缓存击穿
 
-+ 当有多个进程同时获取一个key时, 只有一个进程会真的去缓存db读取或从db加载并返回结果, 其他的进程会等待该进程结束直接收到结果.
-+ 实现方式请转到 [github.com/zlyuancn/zsingleflight](https://github.com/zlyuancn/zsingleflight)
+> 当有多个进程同时获取一个key时, 只有一个进程会真的去缓存db读取或从db加载并返回结果, 其他的进程会等待该进程结束直接收到结果. 实现方式请转到 [github.com/zlyuancn/zsingleflight](https://github.com/zlyuancn/zsingleflight)
 
 # 解决缓存雪崩
 
@@ -20,20 +19,29 @@
 + 可以通过 zbec.WithLocalCache 设置本地缓存
 + 在用户请求key的时候判断它是否可能不存在, 比如判断id长度不等于32(uuid去掉横杠的长度)直接返回错误
 
-# 支持的数据库
+# db数据库
 + 支持任何数据库, 本模块不关心用户如何加载数据
 
-# 支持的缓存数据库
-+ [redis](github.com/go-redis/redis)
-+ [go-cache](github.com/patrickmn/go-cache)
+# 缓存数据库
 + [任何实现 zbec.ICacheDB 的结构](cachedb.go)
++ [redis](./cachedb/redis/c.go)
++ [go-cache](./cachedb/go_cache/c.go)
 
+# 编解码器
++ [任何实现 codec.ICodec 的结构](./codec/codec.go)
++ Byte
++ JSON
++ JsonIterator
++ MsgPack
++ ProtoBuffer
++ Thrift
 
 # 以下是性能测试数据
 
 > 未模拟用户请求和db加载, 直接测试本模块本身的性能
 
 ```shell script
+# 性能测试命令
 go test -v -bench "^Benchmark_.+$" -run ^$ -cpu 20,50,100,1000,10000 .
 # 下面这个是用户没有go环境但是有docker的情况下
 docker run --rm -v ${PWD}/../..:/src/app -v /src/gopath:/src/gopath -v /src/gocache:/src/gocache -w /src/app/zbec/test zlyuan/golang:1.13 go test -v -bench "^Benchmark_.+$" -run ^$ -cpu 20,50,100,1000,10000 .
@@ -41,31 +49,28 @@ docker run --rm -v ${PWD}/../..:/src/app -v /src/gopath:/src/gopath -v /src/goca
 
 # 1000 个key, 每个key 512字节随机数据, 请求key顺序随机
 
-<details>
-<summary>点击展开</summary>
-<pre><code>
+```
 # go-cache
 Benchmark_GoCache1e3-20                     	 1885130	       730 ns/op
 Benchmark_GoCache1e3-50                     	 1568814	       777 ns/op
 Benchmark_GoCache1e3-100                    	 2048479	       744 ns/op
 Benchmark_GoCache1e3-1000                   	 2303812	       642 ns/op
 Benchmark_GoCache1e3-10000                  	 1705032	       716 ns/op
-<br/>
+
 # redis
 Benchmark_Redis1e3-20                       	   88453	     12643 ns/op
 Benchmark_Redis1e3-50                       	  229730	      4961 ns/op
 Benchmark_Redis1e3-100                      	  459921	      2482 ns/op
 Benchmark_Redis1e3-1000                     	 2120120	       555 ns/op
 Benchmark_Redis1e3-10000                    	 1548505	       722 ns/op
-<br/>
+
 # redis and LocalCache
 Benchmark_RedisAndLocalCache1e3-20          	 1948473	       704 ns/op
 Benchmark_RedisAndLocalCache1e3-50          	 1781548	       697 ns/op
 Benchmark_RedisAndLocalCache1e3-100         	 1971524	       697 ns/op
 Benchmark_RedisAndLocalCache1e3-1000        	 2467428	       567 ns/op
 Benchmark_RedisAndLocalCache1e3-10000       	 2359215	       539 ns/op
-</code></pre>
-</details>
+```
 
 
 # 10 000 个key, 每个key 512字节随机数据, 请求key顺序随机
