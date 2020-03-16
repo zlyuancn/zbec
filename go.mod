@@ -13,9 +13,10 @@ require (
 	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
-	github.com/zlyuancn/zerrors v0.0.0-20200117071834-1e03d7b03fbf
-	github.com/zlyuancn/zlog2 v0.0.0-20200120060717-99a69b481d38
+	github.com/zlyuancn/zerrors v0.0.0-20200314053601-170ee7a3baec
+	github.com/zlyuancn/zlog2 v0.0.0-20200316035842-ce70c8743329
 	github.com/zlyuancn/zsingleflight v0.0.0-20191222031535-43d1e1b431df
+	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
