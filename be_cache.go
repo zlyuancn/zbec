@@ -203,7 +203,8 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
         return NilData
     }
 
-    reflect.Indirect(reflect.ValueOf(a)).Set(reflect.Indirect(reflect.ValueOf(out)))
+    // todo: 可以考虑进一步优化, 因为 src 是重复执行
+    reflect.ValueOf(a).Elem().Set(reflect.Indirect(reflect.ValueOf(out)))
     return nil
 }
 
