@@ -189,7 +189,14 @@ func (m *BECache) GetWithLoader(ctx context.Context, query *Query, a interface{}
 func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) error {
     // 同时只能有一个goroutine在获取数据,其它goroutine直接等待结果
     out, err := m.sf.Do(query.FullPath(), func() (interface{}, error) {
-        return m.query(query, a, loader)
+        out, err := m.query(query, a, loader)
+        if err != nil {
+            return nil, err
+        }
+        if out == nil {
+            return nil, NilData
+        }
+        return reflect.Indirect(reflect.ValueOf(out)), err
     })
 
     if err != nil {
@@ -199,12 +206,7 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
         return zerrors.WithMessagef(err, "加载失败<%s>", query.FullPath())
     }
 
-    if out == nil {
-        return NilData
-    }
-
-    // todo: 可以考虑进一步优化, 因为 src 是重复执行
-    reflect.ValueOf(a).Elem().Set(reflect.Indirect(reflect.ValueOf(out)))
+    reflect.ValueOf(a).Elem().Set(out.(reflect.Value))
     return nil
 }
 
