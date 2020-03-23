@@ -37,7 +37,7 @@ func WithLocalCache(ex time.Duration, local_cache ICacheDB) Option {
     }
 }
 
-// 设置是否缓存空数据, 注意: 本地缓存一定会缓存空数据
+// 设置是否缓存空数据, 默认true, 注意: 本地缓存一定会缓存空数据
 func WithCacheNilData(b bool) Option {
     return func(m *BECache) {
         m.cache_nil = b
