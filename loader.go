@@ -9,8 +9,7 @@
 package zbec
 
 import (
-    "crypto/rand"
-    "math/big"
+    "math/rand"
     "time"
 )
 
@@ -66,9 +65,7 @@ func (m *Loader) Expire() time.Duration {
         return m.ex
     }
 
-    max := new(big.Int).SetInt64(int64(m.endex - m.ex))
-    n, _ := rand.Int(rand.Reader, max)
-    return time.Duration(n.Int64()) + m.ex
+    return time.Duration(rand.Int63())%(m.endex-m.ex) + (m.ex)
 }
 
 // 设置加载器名称
