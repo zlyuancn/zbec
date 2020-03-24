@@ -43,3 +43,13 @@ func WithCacheNilData(b bool) Option {
         m.cache_nil = b
     }
 }
+
+// 设置空数据缓存有效时间
+func WithCacheNilDataExpire(ex time.Duration) Option {
+    return func(m *BECache) {
+        if ex <= 0 {
+            ex = DefaultNilDataCacheExpire
+        }
+        m.cache_nil_ex = ex
+    }
+}

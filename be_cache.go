@@ -29,6 +29,9 @@ var NilData = errors.New("空数据")
 // 默认本地缓存有效时间
 const DefaultLocalCacheExpire = time.Second
 
+// 默认空数据缓存有效时间
+const DefaultNilDataCacheExpire = time.Second * 5
+
 type BECache struct {
     cdb ICacheDB // 缓存数据库
 
@@ -40,7 +43,8 @@ type BECache struct {
     mx      sync.RWMutex                // 对注册的加载器加锁
     log     ILoger                      // 日志组件
 
-    cache_nil bool // 是否缓存空数据
+    cache_nil    bool          // 是否缓存空数据
+    cache_nil_ex time.Duration // 空数据缓存时间
 }
 
 func New(c ICacheDB, opts ...Option) *BECache {
@@ -51,7 +55,8 @@ func New(c ICacheDB, opts ...Option) *BECache {
         loaders: make(map[string]ILoader),
         log:     zlog2.DefaultLogger,
 
-        cache_nil: true,
+        cache_nil:    true,
+        cache_nil_ex: DefaultNilDataCacheExpire,
     }
 
     for _, o := range opts {
@@ -111,7 +116,12 @@ func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
         return
     }
 
-    if e := m.cdb.Set(query, a, loader.Expire()); e != nil {
+    ex := m.cache_nil_ex
+    if a != nil {
+        ex = loader.Expire()
+    }
+
+    if e := m.cdb.Set(query, a, ex); e != nil {
         m.log.Warn(zerrors.WithMessagef(e, "缓存失败<%s>", query.FullPath()))
     }
 }
