@@ -136,18 +136,23 @@ func (m *BECache) localCacheSet(query *Query, a interface{}) {
 // 从db加载
 func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (interface{}, error) {
     a, err := loader.Load(query)
-    if err != nil {
-        if delCacheOnErr {
-            if e := m.cdb.Del(query); e != nil { // 从db加载失败时从缓存删除
-                m.log.Warn(zerrors.WithMessagef(e, "db加载失败后删除缓存失败<%s>", query.FullPath()))
-            }
-        }
-        return nil, zerrors.WithMessage(err, "db加载失败")
+
+    if err == nil {
+        m.cacheSet(query, a, loader)
+        return a, nil
     }
 
-    // 缓存
-    m.cacheSet(query, a, loader)
-    return a, nil
+    if err == NilData {
+        m.cacheSet(query, nil, loader)
+        return nil, NilData
+    }
+
+    if delCacheOnErr {
+        if e := m.cdb.Del(query); e != nil { // 从db加载失败时从缓存删除
+            m.log.Warn(zerrors.WithMessagef(e, "db加载失败后删除缓存失败<%s>", query.FullPath()))
+        }
+    }
+    return nil, zerrors.WithMessage(err, "db加载失败")
 }
 
 // 获取数据, 空间必须已注册加载器
