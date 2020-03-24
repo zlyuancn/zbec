@@ -134,12 +134,13 @@ func (m *BECache) localCacheSet(query *Query, a interface{}) {
 }
 
 // 从db加载
-func (m *BECache) loadDB(query *Query, loader ILoader) (interface{}, error) {
-    // 从db加载
+func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (interface{}, error) {
     a, err := loader.Load(query)
     if err != nil {
-        if e := m.cdb.Del(query); e != nil { // 从db加载失败时从缓存删除
-            m.log.Warn(zerrors.WithMessagef(e, "db加载失败后删除缓存失败<%s>", query.FullPath()))
+        if delCacheOnErr {
+            if e := m.cdb.Del(query); e != nil { // 从db加载失败时从缓存删除
+                m.log.Warn(zerrors.WithMessagef(e, "db加载失败后删除缓存失败<%s>", query.FullPath()))
+            }
         }
         return nil, zerrors.WithMessage(err, "db加载失败")
     }
@@ -168,22 +169,14 @@ func (m *BECache) GetWithContext(ctx context.Context, query *Query, a interface{
 // 获取数据, 缓存数据不存在时使用指定加载器获取数据
 func (m *BECache) GetWithLoader(ctx context.Context, query *Query, a interface{}, loader ILoader) (err error) {
     query.Check()
-    if ctx == nil {
+    return doFnWithContext(ctx, func() error {
         return m.getWithLoader(query, a, loader)
-    }
+    })
+}
 
-    done := make(chan struct{})
-    go func() {
-        err = m.getWithLoader(query, a, loader)
-        done <- struct{}{}
-    }()
-
-    select {
-    case <-done:
-        return err
-    case <-ctx.Done():
-        return ctx.Err()
-    }
+// 获取数据, 缓存数据不存在时使用指定加载函数获取数据
+func (m *BECache) GetWithLoaderFn(ctx context.Context, query *Query, a interface{}, fn LoaderFn) (err error) {
+    return m.GetWithLoader(ctx, query, a, NewLoader(fn))
 }
 
 func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) error {
@@ -216,7 +209,7 @@ func (m *BECache) query(query *Query, a interface{}, loader ILoader) (interface{
         return out, gerr
     }
 
-    out, lerr := m.loadDB(query, loader)
+    out, lerr := m.loadDB(query, loader, false)
     if lerr == nil || lerr == NilData {
         return out, lerr
     }
@@ -233,7 +226,42 @@ func (m *BECache) DelData(query *Query) error {
     return m.cacheDel(query)
 }
 
+// 删除指定数据
+func (m *BECache) DelDataWithContext(ctx context.Context, query *Query) (err error) {
+    query.Check()
+    return doFnWithContext(ctx, func() error {
+        return m.cacheDel(query)
+    })
+}
+
 // 删除空间数据
 func (m *BECache) DelSpaceData(space string) error {
     return m.cacheDelSpace(space)
+}
+
+// 删除空间数据
+func (m *BECache) DelSpaceDataWithContext(ctx context.Context, space string) error {
+    return doFnWithContext(ctx, func() error {
+        return m.cacheDelSpace(space)
+    })
+}
+
+// 为一个函数添加ctx
+func doFnWithContext(ctx context.Context, fn func() error) (err error) {
+    if ctx == nil {
+        return fn()
+    }
+
+    done := make(chan struct{})
+    go func() {
+        err = fn()
+        done <- struct{}{}
+    }()
+
+    select {
+    case <-done:
+        return err
+    case <-ctx.Done():
+        return ctx.Err()
+    }
 }
