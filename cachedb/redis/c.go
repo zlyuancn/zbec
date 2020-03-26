@@ -9,9 +9,9 @@
 package redis
 
 import (
+    "bytes"
     "crypto/md5"
     "encoding/hex"
-    "fmt"
     "time"
 
     rredis "github.com/go-redis/redis"
@@ -81,11 +81,18 @@ func (m *RedisWrap) DelSpaceData(space string) error {
 }
 
 func makeKey(query *zbec.Query) string {
-    return fmt.Sprintf("%s:%s", query.Space, makeMd5(query.Path()))
+    var bs bytes.Buffer
+    bs.WriteString(query.Space)
+    bs.WriteByte(':')
+    bs.Write(makeMd5(query.Path()))
+    return bs.String()
 }
 
-func makeMd5(text string) string {
+func makeMd5(text string) []byte {
     m := md5.New()
     m.Write([]byte(text))
-    return hex.EncodeToString(m.Sum(nil))
+    src := m.Sum(nil)
+    dst := make([]byte, hex.EncodedLen(len(src)))
+    hex.Encode(dst, src)
+    return dst
 }

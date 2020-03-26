@@ -9,8 +9,7 @@
 package zbec
 
 import (
-    "fmt"
-    "strings"
+    "bytes"
 )
 
 // 查询参数
@@ -55,11 +54,20 @@ func (q *Query) Path() string {
         return q.path
     }
 
-    if len(q.Params) == 0 {
-        q.path = fmt.Sprintf("%s/%s", q.Method, q.Key)
-    } else {
-        q.path = fmt.Sprintf("%s/%s?%s", q.Method, q.Key, strings.Join(q.Params, "&"))
+    var bs bytes.Buffer
+    bs.WriteString(q.Method)
+    bs.WriteByte(':')
+    bs.WriteString(q.Key)
+    if len(q.Params) > 0 {
+        bs.WriteByte('?')
+        for _, v := range q.Params {
+            bs.WriteString(v)
+            bs.WriteByte('&')
+        }
+        q.path = string(bs.Bytes()[:bs.Len()-1])
+        return q.path
     }
+    q.path = bs.String()
     return q.path
 }
 
@@ -69,6 +77,11 @@ func (q *Query) FullPath() string {
         return q.full_path
     }
 
-    q.full_path = fmt.Sprintf("%s:%s", q.Space, q.Path())
+    var bs bytes.Buffer
+    bs.WriteString(q.Space)
+    bs.WriteByte(':')
+    bs.WriteString(q.Path())
+    bs.Bytes()
+    q.full_path = bs.String()
     return q.full_path
 }
