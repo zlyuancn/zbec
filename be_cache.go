@@ -29,6 +29,9 @@ var NilData = errors.New("空数据")
 // 默认本地缓存有效时间
 const DefaultLocalCacheExpire = time.Second
 
+// 默认空数据缓存有效时间
+const DefaultNilDataCacheExpire = time.Second * 5
+
 type BECache struct {
     cdb ICacheDB // 缓存数据库
 
@@ -40,7 +43,8 @@ type BECache struct {
     mx      sync.RWMutex                // 对注册的加载器加锁
     log     ILoger                      // 日志组件
 
-    cache_nil bool // 是否缓存空数据
+    cache_nil    bool          // 是否缓存空数据
+    cache_nil_ex time.Duration // 空数据缓存时间
 }
 
 func New(c ICacheDB, opts ...Option) *BECache {
@@ -51,7 +55,8 @@ func New(c ICacheDB, opts ...Option) *BECache {
         loaders: make(map[string]ILoader),
         log:     zlog2.DefaultLogger,
 
-        cache_nil: true,
+        cache_nil:    true,
+        cache_nil_ex: DefaultNilDataCacheExpire,
     }
 
     for _, o := range opts {
@@ -111,7 +116,12 @@ func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
         return
     }
 
-    if e := m.cdb.Set(query, a, loader.Expire()); e != nil {
+    ex := m.cache_nil_ex
+    if a != nil {
+        ex = loader.Expire()
+    }
+
+    if e := m.cdb.Set(query, a, ex); e != nil {
         m.log.Warn(zerrors.WithMessagef(e, "缓存失败<%s>", query.FullPath()))
     }
 }
@@ -134,19 +144,25 @@ func (m *BECache) localCacheSet(query *Query, a interface{}) {
 }
 
 // 从db加载
-func (m *BECache) loadDB(query *Query, loader ILoader) (interface{}, error) {
-    // 从db加载
+func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (interface{}, error) {
     a, err := loader.Load(query)
-    if err != nil {
+
+    if err == nil {
+        m.cacheSet(query, a, loader)
+        return a, nil
+    }
+
+    if err == NilData {
+        m.cacheSet(query, nil, loader)
+        return nil, NilData
+    }
+
+    if delCacheOnErr {
         if e := m.cdb.Del(query); e != nil { // 从db加载失败时从缓存删除
             m.log.Warn(zerrors.WithMessagef(e, "db加载失败后删除缓存失败<%s>", query.FullPath()))
         }
-        return nil, zerrors.WithMessage(err, "db加载失败")
     }
-
-    // 缓存
-    m.cacheSet(query, a, loader)
-    return a, nil
+    return nil, zerrors.WithMessage(err, "db加载失败")
 }
 
 // 获取数据, 空间必须已注册加载器
@@ -168,22 +184,14 @@ func (m *BECache) GetWithContext(ctx context.Context, query *Query, a interface{
 // 获取数据, 缓存数据不存在时使用指定加载器获取数据
 func (m *BECache) GetWithLoader(ctx context.Context, query *Query, a interface{}, loader ILoader) (err error) {
     query.Check()
-    if ctx == nil {
+    return doFnWithContext(ctx, func() error {
         return m.getWithLoader(query, a, loader)
-    }
+    })
+}
 
-    done := make(chan struct{})
-    go func() {
-        err = m.getWithLoader(query, a, loader)
-        done <- struct{}{}
-    }()
-
-    select {
-    case <-done:
-        return err
-    case <-ctx.Done():
-        return ctx.Err()
-    }
+// 获取数据, 缓存数据不存在时使用指定加载函数获取数据
+func (m *BECache) GetWithLoaderFn(ctx context.Context, query *Query, a interface{}, fn LoaderFn) (err error) {
+    return m.GetWithLoader(ctx, query, a, NewLoader(fn))
 }
 
 func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) error {
@@ -216,7 +224,7 @@ func (m *BECache) query(query *Query, a interface{}, loader ILoader) (interface{
         return out, gerr
     }
 
-    out, lerr := m.loadDB(query, loader)
+    out, lerr := m.loadDB(query, loader, false)
     if lerr == nil || lerr == NilData {
         return out, lerr
     }
@@ -233,7 +241,42 @@ func (m *BECache) DelData(query *Query) error {
     return m.cacheDel(query)
 }
 
+// 删除指定数据
+func (m *BECache) DelDataWithContext(ctx context.Context, query *Query) (err error) {
+    query.Check()
+    return doFnWithContext(ctx, func() error {
+        return m.cacheDel(query)
+    })
+}
+
 // 删除空间数据
 func (m *BECache) DelSpaceData(space string) error {
     return m.cacheDelSpace(space)
+}
+
+// 删除空间数据
+func (m *BECache) DelSpaceDataWithContext(ctx context.Context, space string) error {
+    return doFnWithContext(ctx, func() error {
+        return m.cacheDelSpace(space)
+    })
+}
+
+// 为一个函数添加ctx
+func doFnWithContext(ctx context.Context, fn func() error) (err error) {
+    if ctx == nil {
+        return fn()
+    }
+
+    done := make(chan struct{})
+    go func() {
+        err = fn()
+        done <- struct{}{}
+    }()
+
+    select {
+    case <-done:
+        return err
+    case <-ctx.Done():
+        return ctx.Err()
+    }
 }
