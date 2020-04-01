@@ -172,10 +172,9 @@ func (m *BECache) Get(query *Query, a interface{}) error {
 
 // 获取数据, 空间必须已注册加载器
 func (m *BECache) GetWithContext(ctx context.Context, query *Query, a interface{}) error {
-    query.Check()
-    space := m.getLoader(query.Space)
+    space := m.getLoader(query.Space())
     if space == nil {
-        return zerrors.NewSimplef("空间未注册加载器 <%s>", query.Space)
+        return zerrors.NewSimplef("空间未注册加载器 <%s>", query.Space())
     }
 
     return m.GetWithLoader(ctx, query, a, space)
@@ -183,7 +182,6 @@ func (m *BECache) GetWithContext(ctx context.Context, query *Query, a interface{
 
 // 获取数据, 缓存数据不存在时使用指定加载器获取数据
 func (m *BECache) GetWithLoader(ctx context.Context, query *Query, a interface{}, loader ILoader) (err error) {
-    query.Check()
     return doFnWithContext(ctx, func() error {
         return m.getWithLoader(query, a, loader)
     })
@@ -237,13 +235,11 @@ func (m *BECache) query(query *Query, a interface{}, loader ILoader) (interface{
 
 // 删除指定数据
 func (m *BECache) DelData(query *Query) error {
-    query.Check()
     return m.cacheDel(query)
 }
 
 // 删除指定数据
 func (m *BECache) DelDataWithContext(ctx context.Context, query *Query) (err error) {
-    query.Check()
     return doFnWithContext(ctx, func() error {
         return m.cacheDel(query)
     })

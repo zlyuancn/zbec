@@ -82,7 +82,7 @@ func (m *RedisWrap) DelSpaceData(space string) error {
 
 func makeKey(query *zbec.Query) string {
     var bs bytes.Buffer
-    bs.WriteString(query.Space)
+    bs.WriteString(query.Space())
     bs.WriteByte(':')
     bs.Write(makeMd5(query.Path()))
     return bs.String()

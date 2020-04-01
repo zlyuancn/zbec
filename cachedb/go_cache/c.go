@@ -62,14 +62,14 @@ func (m *GoCache) getCache(name string) *cache.Cache {
 }
 
 func (m *GoCache) Set(query *zbec.Query, v interface{}, ex time.Duration) error {
-    c := m.getCache(query.Space)
+    c := m.getCache(query.Space())
     c.Set(query.Path(), v, ex)
     return nil
 }
 
 func (m *GoCache) Get(query *zbec.Query, a interface{}) (interface{}, error) {
     m.mx.RLock()
-    c, ok := m.cdbs[query.Space]
+    c, ok := m.cdbs[query.Space()]
     m.mx.RUnlock()
 
     if !ok {
@@ -85,7 +85,7 @@ func (m *GoCache) Get(query *zbec.Query, a interface{}) (interface{}, error) {
 
 func (m *GoCache) Del(query *zbec.Query) error {
     m.mx.RLock()
-    c, ok := m.cdbs[query.Space]
+    c, ok := m.cdbs[query.Space()]
     m.mx.RUnlock()
 
     if !ok {
