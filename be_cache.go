@@ -9,12 +9,14 @@
 package zbec
 
 import (
+    "bytes"
     "context"
     "errors"
     "reflect"
     "sync"
     "time"
 
+    "github.com/vmihailenco/msgpack"
     "github.com/zlyuancn/zerrors"
     "github.com/zlyuancn/zlog2"
     "github.com/zlyuancn/zsingleflight"
@@ -45,6 +47,8 @@ type BECache struct {
 
     cache_nil    bool          // 是否缓存空数据
     cache_nil_ex time.Duration // 空数据缓存时间
+
+    deepcopy_result bool // 对结果进行深拷贝
 }
 
 func New(c ICacheDB, opts ...Option) *BECache {
@@ -202,6 +206,12 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
         if out == nil {
             return nil, NilData
         }
+
+        if m.deepcopy_result {
+            var buf bytes.Buffer
+            err = msgpack.NewEncoder(&buf).Encode(out)
+            return buf.Bytes(), err
+        }
         return reflect.Indirect(reflect.ValueOf(out)), err
     })
 
@@ -210,6 +220,10 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
             return NilData
         }
         return zerrors.WithMessagef(err, "加载失败<%s>", query.FullPath())
+    }
+
+    if m.deepcopy_result {
+        return msgpack.NewDecoder(bytes.NewReader(out.([]byte))).Decode(a)
     }
 
     reflect.ValueOf(a).Elem().Set(out.(reflect.Value))
@@ -275,4 +289,15 @@ func doFnWithContext(ctx context.Context, fn func() error) (err error) {
     case <-ctx.Done():
         return ctx.Err()
     }
+}
+
+// 深拷贝, 必须传入指针
+func deepCopy(dst interface{}, src []byte) error {
+    var buf bytes.Buffer
+    err := msgpack.NewEncoder(&buf).Encode(src)
+    if err != nil {
+        return err
+    }
+
+    return msgpack.NewDecoder(bytes.NewReader(buf.Bytes())).Decode(dst)
 }

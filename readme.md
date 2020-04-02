@@ -138,7 +138,7 @@ Benchmark_RedisAndLocalCache1e5-10000       	 1857760	       562 ns/op
 + 从数据库加载结果为空时应该返回`zbec.NilData`错误
 + 本地缓存一定会缓存空数据
 + 缓存数据库会根据设置的空数据过期时间缓存空数据, 默认为 5s
-
++ 如果你可能对结果进行修改, 为了不产生并发写错误, 你应该设置 `zbec.WithDeepcopyResult(true)` , 代价是性能有所降低
 
 # 示例代码
 

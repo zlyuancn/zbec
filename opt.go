@@ -53,3 +53,10 @@ func WithCacheNilDataExpire(ex time.Duration) Option {
         m.cache_nil_ex = ex
     }
 }
+
+// 对结果进行深拷贝, 每次获取同一个key的结果将分别占有一个内存空间, 代价是性能有所降低
+func WithDeepcopyResult(b bool) Option {
+    return func(m *BECache) {
+        m.deepcopy_result = b
+    }
+}
