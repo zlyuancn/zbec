@@ -24,17 +24,21 @@ import (
 var _ zbec.ICacheDB = (*RedisWrap)(nil)
 
 type RedisWrap struct {
-    cdb rredis.UniversalClient
-    c   codec.ICodec
+    cdb   rredis.UniversalClient
+    codec codec.ICodec
 }
 
-func Wrap(db rredis.UniversalClient) *RedisWrap {
-    return &RedisWrap{cdb: db, c: codec.GetCodec(codec.DefaultCodecType)}
+func Wrap(db rredis.UniversalClient, opts ...Option) *RedisWrap {
+    m := &RedisWrap{cdb: db, codec: codec.GetCodec(codec.DefaultCodecType)}
+    for _, o := range opts {
+        o(m)
+    }
+    return m
 }
 
 // 设置编解码器
 func (m *RedisWrap) SetCodecType(ctype codec.CodecType) *RedisWrap {
-    m.c = codec.GetCodec(ctype)
+    m.codec = codec.GetCodec(ctype)
     return m
 }
 
@@ -43,7 +47,7 @@ func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) erro
         return m.cdb.Set(makeKey(query), []byte{}, ex).Err()
     }
 
-    bs, err := m.c.Encode(v)
+    bs, err := m.codec.Encode(v)
     if err != nil {
         return zerrors.WrapSimplef(err, "编码失败 %T", v)
     }
@@ -60,7 +64,7 @@ func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
         return nil, zbec.NilData
     }
 
-    err = m.c.Decode(bs, a)
+    err = m.codec.Decode(bs, a)
     if err != nil {
         return nil, zerrors.WrapSimplef(err, "解码失败 %T", a)
     }
