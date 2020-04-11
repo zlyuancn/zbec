@@ -14,6 +14,7 @@ import (
     "encoding/hex"
     "time"
 
+    "github.com/afex/hystrix-go/hystrix"
     rredis "github.com/go-redis/redis"
     "github.com/zlyuancn/zerrors"
 
@@ -24,8 +25,9 @@ import (
 var _ zbec.ICacheDB = (*RedisWrap)(nil)
 
 type RedisWrap struct {
-    cdb   rredis.UniversalClient
-    codec codec.ICodec
+    cdb    rredis.UniversalClient
+    codec  codec.ICodec
+    qfname string // qf是断路器符号
 }
 
 func Wrap(db rredis.UniversalClient, opts ...Option) *RedisWrap {
@@ -51,20 +53,36 @@ func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) erro
     if err != nil {
         return zerrors.WrapSimplef(err, "编码失败 %T", v)
     }
-    return m.cdb.Set(makeKey(query), bs, ex).Err()
+    return m.do(func() error {
+        return m.cdb.Set(makeKey(query), bs, ex).Err()
+    })
 }
 
 func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
-    bs, err := m.cdb.Get(makeKey(query)).Bytes()
-    if err == rredis.Nil {
+    var data []byte
+    var err error
+    empty := false
+    err = m.do(func() error {
+        bs, e := m.cdb.Get(makeKey(query)).Bytes()
+        data = bs
+        if e == rredis.Nil {
+            empty = true
+            return nil
+        }
+        return e
+    })
+
+    if err != nil {
+        return nil, zerrors.WithSimple(err)
+    }
+    if empty {
         return nil, zbec.ErrNoEntry
     }
-
-    if len(bs) == 0 {
+    if len(data) == 0 {
         return nil, zbec.NilData
     }
 
-    err = m.codec.Decode(bs, a)
+    err = m.codec.Decode(data, a)
     if err != nil {
         return nil, zerrors.WrapSimplef(err, "解码失败 %T", a)
     }
@@ -73,11 +91,13 @@ func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
 }
 
 func (m *RedisWrap) Del(query *zbec.Query) error {
-    err := m.cdb.Del(makeKey(query)).Err()
-    if err == rredis.Nil {
-        return nil
-    }
-    return err
+    return m.do(func() error {
+        err := m.cdb.Del(makeKey(query)).Err()
+        if err == rredis.Nil {
+            return nil
+        }
+        return err
+    })
 }
 
 func (m *RedisWrap) DelSpaceData(space string) error {
@@ -99,4 +119,11 @@ func makeMd5(text string) []byte {
     dst := make([]byte, hex.EncodedLen(len(src)))
     hex.Encode(dst, src)
     return dst
+}
+
+func (m *RedisWrap) do(fn func() error) error {
+    if m.qfname == "" {
+        return fn()
+    }
+    return hystrix.Do(m.qfname, fn, nil)
 }

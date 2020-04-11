@@ -3,6 +3,7 @@ module github.com/zlyuancn/zbec
 go 1.13
 
 require (
+	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
 	github.com/apache/thrift v0.13.0
 	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/gogo/protobuf v1.3.1
@@ -12,6 +13,7 @@ require (
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/zlyuancn/zerrors v0.0.0-20200314053601-170ee7a3baec
 	github.com/zlyuancn/zlog2 v0.0.0-20200316035842-ce70c8743329

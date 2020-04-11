@@ -20,3 +20,10 @@ func WithCodecType(ctype codec.CodecType) Option {
         m.codec = codec.GetCodec(ctype)
     }
 }
+
+// 设置断路器名, 空名称表示不使用断路器
+func WithHystrixName(qfname string) Option {
+    return func(m *RedisWrap) {
+        m.qfname = qfname
+    }
+}
