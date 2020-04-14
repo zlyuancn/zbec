@@ -294,14 +294,3 @@ func doFnWithContext(ctx context.Context, fn func() error) (err error) {
         return ctx.Err()
     }
 }
-
-// 深拷贝, 必须传入指针
-func deepCopy(dst interface{}, src []byte) error {
-    var buf bytes.Buffer
-    err := msgpack.NewEncoder(&buf).Encode(src)
-    if err != nil {
-        return err
-    }
-
-    return msgpack.NewDecoder(bytes.NewReader(buf.Bytes())).Decode(dst)
-}
