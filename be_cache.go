@@ -152,6 +152,10 @@ func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (inte
     a, err := loader.Load(query)
 
     if err == nil {
+        if a == nil {
+            m.cacheSet(query, nil, loader)
+            return nil, NilData
+        }
         m.cacheSet(query, a, loader)
         return a, nil
     }
