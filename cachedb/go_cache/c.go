@@ -80,6 +80,10 @@ func (m *GoCache) Get(query *zbec.Query, a interface{}) (interface{}, error) {
     if !ok {
         return nil, zbec.ErrNoEntry
     }
+
+    if out == nil {
+        return nil, zbec.NilData
+    }
     return out, nil
 }
 
