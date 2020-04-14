@@ -110,7 +110,7 @@ func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
         return nil, NilData
     }
     if err == ErrNoEntry {
-        return out, err
+        return nil, ErrNoEntry
     }
     return nil, zerrors.WithMessage(err, "缓存加载失败")
 }
