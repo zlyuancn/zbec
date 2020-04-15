@@ -51,7 +51,9 @@ func (m *RedisWrap) SetCodecType(ctype codec.CodecType) *RedisWrap {
 
 func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) error {
     if v == nil {
-        return m.cdb.Set(m.makeKey(query), []byte{}, ex).Err()
+        return m.do(func() error {
+            return m.cdb.Set(m.makeKey(query), []byte{}, ex).Err()
+        })
     }
 
     bs, err := m.codec.Encode(v)
