@@ -25,13 +25,18 @@ import (
 var _ zbec.ICacheDB = (*RedisWrap)(nil)
 
 type RedisWrap struct {
-    cdb    rredis.UniversalClient
-    codec  codec.ICodec
-    qfname string // qf是断路器符号
+    cdb        rredis.UniversalClient
+    codec      codec.ICodec
+    md5_params bool
+    qfname     string // qf是断路器符号
 }
 
 func Wrap(db rredis.UniversalClient, opts ...Option) *RedisWrap {
-    m := &RedisWrap{cdb: db, codec: codec.GetCodec(codec.DefaultCodecType)}
+    m := &RedisWrap{
+        cdb:        db,
+        codec:      codec.GetCodec(codec.DefaultCodecType),
+        md5_params: true,
+    }
     for _, o := range opts {
         o(m)
     }
@@ -46,7 +51,7 @@ func (m *RedisWrap) SetCodecType(ctype codec.CodecType) *RedisWrap {
 
 func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) error {
     if v == nil {
-        return m.cdb.Set(makeKey(query), []byte{}, ex).Err()
+        return m.cdb.Set(m.makeKey(query), []byte{}, ex).Err()
     }
 
     bs, err := m.codec.Encode(v)
@@ -54,7 +59,7 @@ func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) erro
         return zerrors.WrapSimplef(err, "编码失败 %T", v)
     }
     return m.do(func() error {
-        return m.cdb.Set(makeKey(query), bs, ex).Err()
+        return m.cdb.Set(m.makeKey(query), bs, ex).Err()
     })
 }
 
@@ -63,7 +68,7 @@ func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
     var err error
     empty := false
     err = m.do(func() error {
-        bs, e := m.cdb.Get(makeKey(query)).Bytes()
+        bs, e := m.cdb.Get(m.makeKey(query)).Bytes()
         data = bs
         if e == rredis.Nil {
             empty = true
@@ -92,7 +97,7 @@ func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
 
 func (m *RedisWrap) Del(query *zbec.Query) error {
     return m.do(func() error {
-        err := m.cdb.Del(makeKey(query)).Err()
+        err := m.cdb.Del(m.makeKey(query)).Err()
         if err == rredis.Nil {
             return nil
         }
@@ -104,11 +109,15 @@ func (m *RedisWrap) DelSpaceData(space string) error {
     return zerrors.NewSimple("不提供删除空间数据功能")
 }
 
-func makeKey(query *zbec.Query) string {
+func (m *RedisWrap) makeKey(query *zbec.Query) string {
     var bs bytes.Buffer
     bs.WriteString(query.Space())
     bs.WriteByte(':')
-    bs.Write(makeMd5(query.Path()))
+    if m.md5_params {
+        bs.Write(makeMd5(query.Path()))
+    } else {
+        bs.WriteString(query.Path())
+    }
     return bs.String()
 }
 

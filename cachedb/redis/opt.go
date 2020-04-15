@@ -27,3 +27,10 @@ func WithHystrixName(qfname string) Option {
         m.qfname = qfname
     }
 }
+
+// 将query的params做md5, 默认为true
+func WithMd5QueryParams(b bool) Option {
+    return func(m *RedisWrap) {
+        m.md5_params = b
+    }
+}
