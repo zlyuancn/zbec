@@ -17,11 +17,13 @@ import (
     rredis "github.com/go-redis/redis"
     "github.com/zlyuancn/zerrors"
 
-    "github.com/zlyuancn/zbec"
+    "github.com/zlyuancn/zbec/cachedb"
     "github.com/zlyuancn/zbec/codec"
+    "github.com/zlyuancn/zbec/errs"
+    "github.com/zlyuancn/zbec/query"
 )
 
-var _ zbec.ICacheDB = (*RedisWrap)(nil)
+var _ cachedb.ICacheDB = (*RedisWrap)(nil)
 
 type RedisWrap struct {
     cdb        rredis.UniversalClient
@@ -42,9 +44,11 @@ func Wrap(db rredis.UniversalClient, opts ...Option) *RedisWrap {
     return m
 }
 
-func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) (err error) {
-    if v == nil { // 不缓存空数据
-        return nil
+func (m *RedisWrap) Set(query *query.Query, v interface{}, ex time.Duration) error {
+    if v == nil {
+        return m.do(func() error {
+            return m.cdb.HSet(query.Space(), m.makeKey(query), []byte{}).Err()
+        })
     }
 
     bs, err := m.codec.Encode(v)
@@ -56,7 +60,7 @@ func (m *RedisWrap) Set(query *zbec.Query, v interface{}, ex time.Duration) (err
     })
 }
 
-func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
+func (m *RedisWrap) Get(query *query.Query, a interface{}) (interface{}, error) {
     var data []byte
     var err error
     empty := false
@@ -74,10 +78,10 @@ func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
         return nil, zerrors.WithSimple(err)
     }
     if empty {
-        return nil, zbec.ErrNoEntry
+        return nil, errs.ErrNoEntry
     }
     if len(data) == 0 {
-        return nil, zbec.NilData
+        return nil, errs.NoEntry
     }
 
     err = m.codec.Decode(data, a)
@@ -88,7 +92,7 @@ func (m *RedisWrap) Get(query *zbec.Query, a interface{}) (interface{}, error) {
     return a, nil
 }
 
-func (m *RedisWrap) Del(query *zbec.Query) error {
+func (m *RedisWrap) Del(query *query.Query) error {
     return m.do(func() error {
         err := m.cdb.HDel(query.Space(), m.makeKey(query)).Err()
         if err == rredis.Nil {
@@ -108,7 +112,7 @@ func (m *RedisWrap) DelSpaceData(space string) error {
     })
 }
 
-func (m *RedisWrap) makeKey(query *zbec.Query) string {
+func (m *RedisWrap) makeKey(query *query.Query) string {
     if m.md5_params {
         return string(makeMd5(query.Path()))
     }

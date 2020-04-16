@@ -6,7 +6,7 @@
 -------------------------------------------------
 */
 
-package zbec
+package query
 
 import (
     "bytes"

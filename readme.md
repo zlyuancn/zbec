@@ -15,7 +15,7 @@
 
 # 解决缓存穿透
 
-+ 可以通过 `zbec.WithCacheNilData` 开启缓存空数据(默认开启), 空数据有效时间默认为 5s
++ 可以通过 `zbec.WithCacheNoEntry` 开启缓存空条目(默认开启), 空条目有效时间默认为 5s
 + 可以通过 `zbec.WithLocalCache` 设置本地缓存
 + 在用户请求key的时候判断它是否可能不存在, 比如判断id长度不等于32(uuid去掉横杠的长度)直接返回错误
 
@@ -23,7 +23,7 @@
 + 支持任何数据库, 本模块不关心用户如何加载数据
 
 # 缓存数据库
-+ [任何实现 `zbec.ICacheDB` 的结构](cachedb.go)
++ [任何实现 `cachedb.ICacheDB` 的结构](./cachedb/cachedb.go)
 + [redis](./cachedb/redis/c.go)
 + [go-cache](./cachedb/go_cache/c.go)
 
@@ -135,9 +135,7 @@ Benchmark_RedisAndLocalCache1e5-10000       	 1857760	       562 ns/op
 # 开发注意事项
 
 + 获取值时保存结果的变量必须是一个指针
-+ 从数据库加载结果为空时应该返回`zbec.NilData`错误
-+ 本地缓存一定会缓存空数据
-+ 缓存数据库会根据设置的空数据过期时间缓存空数据, 默认为 5s
++ 从数据库加载条目为空时应该返回`zbec.ErrNoEntry`错误
 + 如果你可能对结果进行修改, 为了不产生并发写错误, 你应该设置 `zbec.WithDeepcopyResult(true)` , 代价是性能有所降低
 
 # 示例代码

@@ -14,12 +14,14 @@ import (
 
     "github.com/patrickmn/go-cache"
 
-    "github.com/zlyuancn/zbec"
+    "github.com/zlyuancn/zbec/cachedb"
+    "github.com/zlyuancn/zbec/errs"
+    "github.com/zlyuancn/zbec/query"
 )
 
 const DefaultCleanupInterval = time.Minute * 5
 
-var _ zbec.ICacheDB = (*GoCache)(nil)
+var _ cachedb.ICacheDB = (*GoCache)(nil)
 
 type GoCache struct {
     cdbs map[string]*cache.Cache
@@ -61,33 +63,33 @@ func (m *GoCache) getCache(name string) *cache.Cache {
     return c
 }
 
-func (m *GoCache) Set(query *zbec.Query, v interface{}, ex time.Duration) error {
+func (m *GoCache) Set(query *query.Query, v interface{}, ex time.Duration) error {
     c := m.getCache(query.Space())
     c.Set(query.Path(), v, ex)
     return nil
 }
 
-func (m *GoCache) Get(query *zbec.Query, a interface{}) (interface{}, error) {
+func (m *GoCache) Get(query *query.Query, a interface{}) (interface{}, error) {
     m.mx.RLock()
     c, ok := m.cdbs[query.Space()]
     m.mx.RUnlock()
 
     if !ok {
-        return nil, zbec.ErrNoEntry
+        return nil, errs.ErrNoEntry
     }
 
     out, ok := c.Get(query.Path())
     if !ok {
-        return nil, zbec.ErrNoEntry
+        return nil, errs.ErrNoEntry
     }
 
-    if out == nil {
-        return nil, zbec.NilData
+    if out == errs.NoEntry {
+        return nil, errs.NoEntry
     }
     return out, nil
 }
 
-func (m *GoCache) Del(query *zbec.Query) error {
+func (m *GoCache) Del(query *query.Query) error {
     m.mx.RLock()
     c, ok := m.cdbs[query.Space()]
     m.mx.RUnlock()

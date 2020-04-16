@@ -24,7 +24,7 @@ type ILoader interface {
     Expire() (ex time.Duration)
 }
 
-// db加载函数
+// db加载函数, 如果是不存在的条目, 应该返回 zbec.ErrNoEntry
 type LoaderFn func(query *Query) (interface{}, error)
 
 var _ ILoader = (*Loader)(nil)

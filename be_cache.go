@@ -20,53 +20,66 @@ import (
     "github.com/zlyuancn/zerrors"
     "github.com/zlyuancn/zlog2"
     "github.com/zlyuancn/zsingleflight"
+
+    "github.com/zlyuancn/zbec/cachedb"
+    "github.com/zlyuancn/zbec/errs"
+    "github.com/zlyuancn/zbec/query"
 )
 
-var ErrNoEntry = errors.New("条目不存在")
-var ErrLoaderFnNotExists = errors.New("db加载函数不存在或为空")
+var (
+    // db加载函数不存在或为空
+    ErrLoaderFnNotExists = errs.ErrLoaderFnNotExists
+    // 缓存或db加载的条目不存在应该返回这个错误
+    ErrNoEntry = errs.ErrNoEntry
+    // 由缓存保存的ErrNoEntry错误
+    NoEntry = errs.NoEntry
+)
 
-// 表示缓存数据库字节长度为0, 或者db加载结果为nil
-var NilData = errors.New("空数据")
+const (
+    // 默认本地缓存有效时间
+    DefaultLocalCacheExpire = time.Second
+    // 默认缓存空条目有效时间
+    DefaultCacheNoEntryExpire = time.Second * 5
+)
 
-// 默认本地缓存有效时间
-const DefaultLocalCacheExpire = time.Second
+type Query = query.Query
 
-// 默认空数据缓存有效时间
-const DefaultNilDataCacheExpire = time.Second * 5
+var NewQuery = query.NewQuery
 
 type BECache struct {
-    cdb ICacheDB // 缓存数据库
+    cdb cachedb.ICacheDB // 缓存数据库
 
-    local_cdb    ICacheDB      // 本地缓存
-    local_cdb_ex time.Duration // 本地缓存有效时间
+    local_cdb    cachedb.ICacheDB // 本地缓存
+    local_cdb_ex time.Duration    // 本地缓存有效时间
+
+    cache_no_entry    bool          // 是否缓存空条目
+    cache_no_entry_ex time.Duration // 缓存空条目有效时间
 
     sf      *zsingleflight.SingleFlight // 单飞
     loaders map[string]ILoader          // 加载器配置
     mx      sync.RWMutex                // 对注册的加载器加锁
     log     ILoger                      // 日志组件
 
-    cache_nil    bool          // 是否缓存空数据
-    cache_nil_ex time.Duration // 空数据缓存时间
-
     deepcopy_result bool // 对结果进行深拷贝
 }
 
-func New(c ICacheDB, opts ...Option) *BECache {
+func New(c cachedb.ICacheDB, opts ...Option) *BECache {
     m := &BECache{
         cdb: c,
+
+        local_cdb_ex: DefaultLocalCacheExpire,
+
+        cache_no_entry:    true,
+        cache_no_entry_ex: DefaultCacheNoEntryExpire,
 
         sf:      zsingleflight.New(),
         loaders: make(map[string]ILoader),
         log:     zlog2.DefaultLogger,
-
-        cache_nil:    true,
-        cache_nil_ex: DefaultNilDataCacheExpire,
     }
 
     for _, o := range opts {
         o(m)
     }
-
     return m
 }
 
@@ -95,7 +108,7 @@ func (m *BECache) getLoader(space string) ILoader {
 func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
     if m.local_cdb != nil {
         out, err := m.local_cdb.Get(query, a)
-        if err == nil || err == NilData {
+        if err == nil || err == NoEntry {
             return out, err
         }
     }
@@ -105,9 +118,9 @@ func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
         m.localCacheSet(query, out)
         return out, nil
     }
-    if err == NilData {
-        m.localCacheSet(query, nil)
-        return nil, NilData
+    if err == NoEntry {
+        m.localCacheSet(query, NoEntry)
+        return nil, NoEntry
     }
     if err == ErrNoEntry {
         return nil, ErrNoEntry
@@ -116,13 +129,13 @@ func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
 }
 func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
     m.localCacheSet(query, a)
-    if a == nil && !m.cache_nil {
-        return
-    }
 
-    ex := m.cache_nil_ex
-    if a != nil {
-        ex = loader.Expire()
+    ex := loader.Expire()
+    if a == NoEntry {
+        if !m.cache_no_entry {
+            return
+        }
+        ex = m.cache_no_entry_ex
     }
 
     if e := m.cdb.Set(query, a, ex); e != nil {
@@ -153,16 +166,15 @@ func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (inte
 
     if err == nil {
         if a == nil {
-            m.cacheSet(query, nil, loader)
-            return nil, NilData
+            return nil, zerrors.New("db加载结果不能为nil")
         }
         m.cacheSet(query, a, loader)
         return a, nil
     }
 
-    if err == NilData {
-        m.cacheSet(query, nil, loader)
-        return nil, NilData
+    if err == ErrNoEntry {
+        m.cacheSet(query, NoEntry, loader)
+        return nil, ErrNoEntry
     }
 
     if delCacheOnErr {
@@ -208,7 +220,7 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
             return nil, err
         }
         if out == nil {
-            return nil, NilData
+            return nil, nil
         }
 
         if m.deepcopy_result {
@@ -220,10 +232,14 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
     })
 
     if err != nil {
-        if err == NilData {
-            return NilData
+        if err == NoEntry {
+            err = ErrNoEntry
         }
         return zerrors.WithMessagef(err, "加载失败<%s>", query.FullPath())
+    }
+
+    if out == nil {
+        return errors.New("未对nil数据做处理")
     }
 
     if m.deepcopy_result {
@@ -236,16 +252,16 @@ func (m *BECache) getWithLoader(query *Query, a interface{}, loader ILoader) err
 
 func (m *BECache) query(query *Query, a interface{}, loader ILoader) (interface{}, error) {
     out, gerr := m.cacheGet(query, a)
-    if gerr == nil || gerr == NilData {
+    if gerr == nil || gerr == NoEntry {
         return out, gerr
     }
 
     out, lerr := m.loadDB(query, loader, false)
-    if lerr == nil || lerr == NilData {
+    if lerr == nil {
         return out, lerr
     }
 
-    if gerr != ErrNoEntry {
+    if gerr != ErrNoEntry { // 有效的错误
         return nil, zerrors.WithMessage(gerr, lerr.Error())
     }
     return nil, lerr

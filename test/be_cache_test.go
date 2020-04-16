@@ -22,6 +22,7 @@ import (
     "github.com/zlyuancn/zbec/cachedb/go_cache"
     "github.com/zlyuancn/zbec/cachedb/redis"
     "github.com/zlyuancn/zbec/codec"
+    "github.com/zlyuancn/zbec/query"
 )
 
 func getRedisClient(on_local_cache bool) *zbec.BECache {
@@ -36,13 +37,13 @@ func getRedisClient(on_local_cache bool) *zbec.BECache {
         panic(err)
     }
 
-    bec := zbec.New(redis.Wrap(cdb).SetCodecType(codec.Byte))
-
-    if on_local_cache {
-        lcdb := go_cache.NewGoCache(0)
-        bec.SetOptions(zbec.WithLocalCache(0, lcdb))
-    }
-    return bec
+    return zbec.New(
+        redis.Wrap(
+            cdb,
+            redis.WithCodecType(codec.Byte),
+        ),
+        zbec.WithLocalCache(on_local_cache),
+    )
 }
 
 func getGoCache() *zbec.BECache {
@@ -53,7 +54,7 @@ func getGoCache() *zbec.BECache {
 
 func TestGetAndCache(t *testing.T) {
     space := "test"
-    loader := zbec.NewNameLoader(space, func(query *zbec.Query) (i interface{}, err error) {
+    loader := zbec.NewNameLoader(space, func(query *query.Query) (i interface{}, err error) {
         s := fmt.Sprintf("%s", query.FullPath())
         return &s, nil
     })
@@ -132,7 +133,7 @@ func benchmark_any(b *testing.B, bec *zbec.BECache, max_key_count int) {
     byte_len := 512
 
     space := "benchmark"
-    loader := zbec.NewNameLoader(space, func(query *zbec.Query) (interface{}, error) {
+    loader := zbec.NewNameLoader(space, func(query *query.Query) (interface{}, error) {
         bs := make([]byte, byte_len)
         for i := 0; i < len(bs); i++ {
             bs[i] = byte(rand.Int() % 256)

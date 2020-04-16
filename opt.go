@@ -12,6 +12,8 @@ import (
     "time"
 
     "github.com/zlyuancn/zlog2"
+
+    "github.com/zlyuancn/zbec/cachedb/go_cache"
 )
 
 type Option func(m *BECache)
@@ -27,30 +29,29 @@ func WithLogger(log ILoger) Option {
 }
 
 // 设置本地缓存
-func WithLocalCache(ex time.Duration, local_cache ICacheDB) Option {
+func WithLocalCache(local_cache bool, ex ...time.Duration) Option {
     return func(m *BECache) {
-        if ex <= 0 {
-            ex = DefaultLocalCacheExpire
+        if local_cache {
+            m.local_cdb = go_cache.NewGoCache(0)
+        } else {
+            m.local_cdb = nil
         }
-        m.local_cdb_ex = ex
-        m.local_cdb = local_cache
+
+        m.local_cdb_ex = DefaultLocalCacheExpire
+        if len(ex) > 0 && ex[0] > 0 {
+            m.local_cdb_ex = ex[0]
+        }
     }
 }
 
-// 设置是否缓存空数据, 默认true, 注意: 本地缓存一定会缓存空数据
-func WithCacheNilData(b bool) Option {
+// 设置缓存空条目
+func WithCacheNoEntry(cache_no_entry bool, ex ...time.Duration) Option {
     return func(m *BECache) {
-        m.cache_nil = b
-    }
-}
-
-// 设置空数据缓存有效时间
-func WithCacheNilDataExpire(ex time.Duration) Option {
-    return func(m *BECache) {
-        if ex <= 0 {
-            ex = DefaultNilDataCacheExpire
+        m.cache_no_entry = cache_no_entry
+        m.cache_no_entry_ex = DefaultCacheNoEntryExpire
+        if len(ex) > 0 && ex[0] > 0 {
+            m.cache_no_entry_ex = ex[0]
         }
-        m.cache_nil_ex = ex
     }
 }
 
