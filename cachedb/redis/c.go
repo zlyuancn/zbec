@@ -46,7 +46,7 @@ func Wrap(db rredis.UniversalClient, opts ...Option) *RedisWrap {
 }
 
 func (m *RedisWrap) Set(query *query.Query, v interface{}, ex time.Duration) error {
-    if v == nil {
+    if v == errs.NoEntry {
         return m.do(func() error {
             return m.cdb.Set(m.makeKey(query), []byte{}, ex).Err()
         })

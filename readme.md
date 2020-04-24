@@ -15,8 +15,8 @@
 
 # 解决缓存穿透
 
-+ 可以通过 `zbec.WithCacheNoEntry` 开启缓存空条目(默认开启), 空条目有效时间默认为 5s
-+ 可以通过 `zbec.WithLocalCache` 设置本地缓存
++ 可以通过 `zbec.WithCacheNoEntry` 开启缓存空条目(默认开启), db加载函数在没有数据时应该返回 `zbec.ErrNoEntry` 错误
++ 可以通过 `zbec.WithLocalCache` 设置本地缓存, 本地缓存一定会缓存空条目
 + 在用户请求key的时候判断它是否可能不存在, 比如判断id长度不等于32(uuid去掉横杠的长度)直接返回错误
 
 # db数据库
