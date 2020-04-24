@@ -22,6 +22,7 @@ import (
     "github.com/zlyuancn/zsingleflight"
 
     "github.com/zlyuancn/zbec/cachedb"
+    "github.com/zlyuancn/zbec/cachedb/go_cache"
     "github.com/zlyuancn/zbec/cachedb/nocache"
     "github.com/zlyuancn/zbec/errs"
     "github.com/zlyuancn/zbec/query"
@@ -83,6 +84,14 @@ func New(c cachedb.ICacheDB, opts ...Option) *BECache {
         o(m)
     }
     return m
+}
+
+func NewOfGoCache(cleanupInterval time.Duration, opts ...Option) *BECache {
+    return New(go_cache.NewGoCache(cleanupInterval), opts...)
+}
+
+func NewOfNoCache(opts ...Option) *BECache {
+    return New(nocache.New(), opts...)
 }
 
 // 设置, 仅用于初始化设置, 正式使用时不应该再调用这个方法
