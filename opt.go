@@ -14,6 +14,7 @@ import (
     "github.com/zlyuancn/zlog2"
 
     "github.com/zlyuancn/zbec/cachedb/go_cache"
+    "github.com/zlyuancn/zbec/cachedb/nocache"
 )
 
 type Option func(m *BECache)
@@ -34,7 +35,7 @@ func WithLocalCache(local_cache bool, ex ...time.Duration) Option {
         if local_cache {
             m.local_cdb = go_cache.NewGoCache(0)
         } else {
-            m.local_cdb = nil
+            m.local_cdb = nocache.New()
         }
 
         m.local_cdb_ex = DefaultLocalCacheExpire

@@ -22,6 +22,7 @@ import (
     "github.com/zlyuancn/zsingleflight"
 
     "github.com/zlyuancn/zbec/cachedb"
+    "github.com/zlyuancn/zbec/cachedb/nocache"
     "github.com/zlyuancn/zbec/errs"
     "github.com/zlyuancn/zbec/query"
 )
@@ -67,6 +68,7 @@ func New(c cachedb.ICacheDB, opts ...Option) *BECache {
     m := &BECache{
         cdb: c,
 
+        local_cdb:    nocache.New(),
         local_cdb_ex: DefaultLocalCacheExpire,
 
         cache_no_entry:    true,
@@ -106,20 +108,18 @@ func (m *BECache) getLoader(space string) ILoader {
 }
 
 func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
-    if m.local_cdb != nil {
-        out, err := m.local_cdb.Get(query, a)
-        if err == nil || err == NoEntry {
-            return out, err
-        }
+    out, err := m.local_cdb.Get(query, a)
+    if err == nil || err == NoEntry {
+        return out, err
     }
 
-    out, err := m.cdb.Get(query, a)
+    out, err = m.cdb.Get(query, a)
     if err == nil {
-        m.localCacheSet(query, out)
+        _ = m.local_cdb.Set(query, out, m.local_cdb_ex)
         return out, nil
     }
     if err == NoEntry {
-        m.localCacheSet(query, NoEntry)
+        _ = m.local_cdb.Set(query, NoEntry, m.local_cdb_ex)
         return nil, NoEntry
     }
     if err == ErrNoEntry {
@@ -128,7 +128,7 @@ func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
     return nil, zerrors.WithMessage(err, "缓存加载失败")
 }
 func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
-    m.localCacheSet(query, a)
+    _ = m.local_cdb.Set(query, a, m.local_cdb_ex)
 
     ex := loader.Expire()
     if a == NoEntry {
@@ -143,21 +143,12 @@ func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
     }
 }
 func (m *BECache) cacheDel(query *Query) error {
-    if m.local_cdb != nil {
-        _ = m.local_cdb.Del(query)
-    }
+    _ = m.local_cdb.Del(query)
     return m.cdb.Del(query)
 }
 func (m *BECache) cacheDelSpace(space string) error {
-    if m.local_cdb != nil {
-        _ = m.local_cdb.DelSpaceData(space)
-    }
+    _ = m.local_cdb.DelSpaceData(space)
     return m.cdb.DelSpaceData(space)
-}
-func (m *BECache) localCacheSet(query *Query, a interface{}) {
-    if m.local_cdb != nil {
-        _ = m.local_cdb.Set(query, a, m.local_cdb_ex)
-    }
 }
 
 // 从db加载
