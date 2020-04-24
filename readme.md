@@ -140,4 +140,4 @@ Benchmark_RedisAndLocalCache1e5-10000       	 1857760	       562 ns/op
 
 # 示例代码
 
-> 即将出现...
+> [传送门](./example)
