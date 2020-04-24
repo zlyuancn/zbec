@@ -21,9 +21,9 @@ import (
 
 const DefaultCleanupInterval = time.Minute * 5
 
-var _ cachedb.ICacheDB = (*GoCache)(nil)
+var _ cachedb.ICacheDB = (*goCache)(nil)
 
-type GoCache struct {
+type goCache struct {
     cdbs map[string]*cache.Cache
     mx   sync.RWMutex
 
@@ -31,18 +31,18 @@ type GoCache struct {
     cleanupInterval time.Duration
 }
 
-func NewGoCache(cleanupInterval time.Duration) *GoCache {
+func NewGoCache(cleanupInterval time.Duration) cachedb.ICacheDB {
     if cleanupInterval <= 0 {
         cleanupInterval = DefaultCleanupInterval
     }
-    a := &GoCache{
+    a := &goCache{
         cdbs:            make(map[string]*cache.Cache),
         cleanupInterval: cleanupInterval,
     }
     return a
 }
 
-func (m *GoCache) getCache(name string) *cache.Cache {
+func (m *goCache) getCache(name string) *cache.Cache {
     m.mx.RLock()
     c, ok := m.cdbs[name]
     m.mx.RUnlock()
@@ -63,13 +63,13 @@ func (m *GoCache) getCache(name string) *cache.Cache {
     return c
 }
 
-func (m *GoCache) Set(query *query.Query, v interface{}, ex time.Duration) error {
+func (m *goCache) Set(query *query.Query, v interface{}, ex time.Duration) error {
     c := m.getCache(query.Space())
     c.Set(query.Path(), v, ex)
     return nil
 }
 
-func (m *GoCache) Get(query *query.Query, a interface{}) (interface{}, error) {
+func (m *goCache) Get(query *query.Query, a interface{}) (interface{}, error) {
     m.mx.RLock()
     c, ok := m.cdbs[query.Space()]
     m.mx.RUnlock()
@@ -89,7 +89,7 @@ func (m *GoCache) Get(query *query.Query, a interface{}) (interface{}, error) {
     return out, nil
 }
 
-func (m *GoCache) Del(query *query.Query) error {
+func (m *goCache) Del(query *query.Query) error {
     m.mx.RLock()
     c, ok := m.cdbs[query.Space()]
     m.mx.RUnlock()
@@ -102,7 +102,7 @@ func (m *GoCache) Del(query *query.Query) error {
     return nil
 }
 
-func (m *GoCache) DelSpaceData(space string) error {
+func (m *goCache) DelSpaceData(space string) error {
     m.mx.Lock()
     delete(m.cdbs, space)
     m.mx.Unlock()
