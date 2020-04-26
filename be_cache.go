@@ -293,7 +293,7 @@ func (m *BECache) DelSpaceDataWithContext(ctx context.Context, space string) err
 
 // 为一个函数添加ctx
 func doFnWithContext(ctx context.Context, fn func() error) (err error) {
-    if ctx == nil {
+    if ctx == nil || ctx == context.Background() || ctx == context.TODO() {
         return fn()
     }
 
