@@ -61,10 +61,10 @@ type BECache struct {
     default_ex    time.Duration // 默认缓存开始时间
     default_endex time.Duration // 默认缓存结束时间
 
-    sf      *zsingleflight.SingleFlight // 单飞
-    loaders map[string]ILoader          // 加载器配置
-    mx      sync.RWMutex                // 对注册的加载器加锁
-    log     ILoger                      // 日志组件
+    sf      ISingleFlight      // 单飞
+    loaders map[string]ILoader // 加载器配置
+    mx      sync.RWMutex       // 对注册的加载器加锁
+    log     ILoger             // 日志组件
 
     deepcopy_result bool // 对结果进行深拷贝
 }

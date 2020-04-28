@@ -76,3 +76,13 @@ func WithDefaultExpire(ex time.Duration, endex ...time.Duration) Option {
         }
     }
 }
+
+// 设置单飞模块
+func WithSingleFlight(sf ISingleFlight) Option {
+    return func(m *BECache) {
+        if sf == nil {
+            panic("SingleFlight是空的")
+        }
+        m.sf = sf
+    }
+}
