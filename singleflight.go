@@ -11,3 +11,9 @@ package zbec
 type ISingleFlight interface {
     Do(key string, fn func() (interface{}, error)) (interface{}, error)
 }
+
+type NoSingalFlight struct{}
+
+func (*NoSingalFlight) Do(_ string, fn func() (interface{}, error)) (interface{}, error) {
+    return fn()
+}
