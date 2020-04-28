@@ -12,6 +12,7 @@ import (
     "bytes"
     "context"
     "errors"
+    "math/rand"
     "reflect"
     "sync"
     "time"
@@ -57,6 +58,9 @@ type BECache struct {
     cache_no_entry    bool          // 是否缓存空条目
     cache_no_entry_ex time.Duration // 缓存空条目有效时间
 
+    default_ex    time.Duration // 默认缓存开始时间
+    default_endex time.Duration // 默认缓存结束时间
+
     sf      *zsingleflight.SingleFlight // 单飞
     loaders map[string]ILoader          // 加载器配置
     mx      sync.RWMutex                // 对注册的加载器加锁
@@ -74,6 +78,9 @@ func New(c cachedb.ICacheDB, opts ...Option) *BECache {
 
         cache_no_entry:    true,
         cache_no_entry_ex: DefaultCacheNoEntryExpire,
+
+        default_ex:    0,
+        default_endex: 0,
 
         sf:      zsingleflight.New(),
         loaders: make(map[string]ILoader),
@@ -139,12 +146,17 @@ func (m *BECache) cacheGet(query *Query, a interface{}) (interface{}, error) {
 func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
     _ = m.local_cdb.Set(query, a, m.local_cdb_ex)
 
-    ex := loader.Expire()
+    var ex time.Duration
     if a == NoEntry {
         if !m.cache_no_entry {
             return
         }
         ex = m.cache_no_entry_ex
+    } else {
+        ex = loader.Expire()
+        if ex == -1 {
+            ex = makeExpire(m.default_ex, m.default_endex)
+        }
     }
 
     if e := m.cdb.Set(query, a, ex); e != nil {
@@ -309,4 +321,19 @@ func doFnWithContext(ctx context.Context, fn func() error) (err error) {
     case <-ctx.Done():
         return ctx.Err()
     }
+}
+
+func makeExpire(ex, endex time.Duration) time.Duration {
+    if ex == -1 {
+        return -1
+    }
+
+    if endex == 0 {
+        if ex == 0 {
+            return 0
+        }
+        return ex
+    }
+
+    return time.Duration(rand.Int63())%(endex-ex) + (ex)
 }

@@ -62,3 +62,17 @@ func WithDeepcopyResult(b bool) Option {
         m.deepcopy_result = b
     }
 }
+
+// 设置默认缓存时间
+func WithDefaultExpire(ex time.Duration, endex ...time.Duration) Option {
+    return func(m *BECache) {
+        if ex < 1 {
+            ex = 0
+        }
+
+        m.default_ex = ex
+        if len(endex) > 0 {
+            m.default_endex = endex[0]
+        }
+    }
+}

@@ -9,7 +9,6 @@
 package zbec
 
 import (
-    "math/rand"
     "time"
 )
 
@@ -38,12 +37,12 @@ type Loader struct {
 
 // 创建一个加载器
 func NewLoader(loader LoaderFn) *Loader {
-    return &Loader{loader: loader}
+    return &Loader{loader: loader, ex: -1}
 }
 
 // 创建一个加载器并指定名称
 func NewNameLoader(name string, loader LoaderFn) *Loader {
-    return &Loader{name: name, loader: loader}
+    return &Loader{name: name, loader: loader, ex: -1}
 }
 
 func (m *Loader) Name() string {
@@ -58,14 +57,7 @@ func (m *Loader) Load(query *Query) (interface{}, error) {
 }
 
 func (m *Loader) Expire() time.Duration {
-    if m.endex == 0 {
-        if m.ex == 0 {
-            return 0
-        }
-        return m.ex
-    }
-
-    return time.Duration(rand.Int63())%(m.endex-m.ex) + (m.ex)
+    return makeExpire(m.ex, m.endex)
 }
 
 // 设置加载器名称
@@ -81,10 +73,11 @@ func (m *Loader) SetLoader(fn LoaderFn) *Loader {
 }
 
 // 设置过期时间
+// 如果 ex 为-1(默认), 则使用BECache默认过期时间
 // 如果 ex, endex 都为0, 则永不过期
 // 如果 endex 为0, 则过期时间为 ex
 // 如果都不为 0, 则过期时间在 [ex, endex] 区间随机
-func (m *Loader) SetExpirat(ex, endex time.Duration) *Loader {
+func (m *Loader) SetExpire(ex, endex time.Duration) *Loader {
     m.ex, m.endex = ex, endex
     return m
 }
