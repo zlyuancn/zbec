@@ -12,8 +12,13 @@ type ISingleFlight interface {
     Do(key string, fn func() (interface{}, error)) (interface{}, error)
 }
 
-type NoSingalFlight struct{}
+type noSingalFlight struct{}
 
-func (*NoSingalFlight) Do(_ string, fn func() (interface{}, error)) (interface{}, error) {
+// 一个关闭并发控制的ISingleFlight
+func NoSingalFlight() ISingleFlight {
+    return new(noSingalFlight)
+}
+
+func (*noSingalFlight) Do(_ string, fn func() (interface{}, error)) (interface{}, error) {
     return fn()
 }
