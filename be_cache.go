@@ -174,6 +174,10 @@ func (m *BECache) cacheDelSpace(space string) error {
 
 // 从db加载
 func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (interface{}, error) {
+    if loader == nil {
+        return nil, zerrors.NewSimplef("<%s>加载器为nil", query.Space())
+    }
+
     a, err := loader.Load(query)
 
     if err == nil {
@@ -197,18 +201,14 @@ func (m *BECache) loadDB(query *Query, loader ILoader, delCacheOnErr bool) (inte
     return nil, zerrors.WithMessage(err, "db加载失败")
 }
 
-// 获取数据, 空间必须已注册加载器
+// 获取数据, 无数据时空间未注册加载器会返回错误
 func (m *BECache) Get(query *Query, a interface{}) error {
     return m.GetWithContext(nil, query, a)
 }
 
-// 获取数据, 空间必须已注册加载器
+// 获取数据, 无数据时空间未注册加载器会返回错误
 func (m *BECache) GetWithContext(ctx context.Context, query *Query, a interface{}) error {
     space := m.getLoader(query.Space())
-    if space == nil {
-        return zerrors.NewSimplef("空间未注册加载器 <%s>", query.Space())
-    }
-
     return m.GetWithLoader(ctx, query, a, space)
 }
 
