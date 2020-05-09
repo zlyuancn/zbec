@@ -303,6 +303,37 @@ func (m *BECache) DelSpaceDataWithContext(ctx context.Context, space string) err
     })
 }
 
+// 设置数据到缓存
+func (m *BECache) Set(query *Query, a interface{}, ex ...time.Duration) error {
+    return m.SetWithContext(nil, query, a, ex...)
+}
+
+// 设置数据到缓存
+func (m *BECache) SetWithContext(ctx context.Context, query *Query, a interface{}, ex ...time.Duration) error {
+    return doFnWithContext(ctx, func() error {
+        var expire = time.Duration(-1)
+        if len(ex) > 0 {
+            expire = ex[0]
+        }
+
+        if a == NoEntry {
+            if !m.cache_no_entry {
+                _ = m.local_cdb.Set(query, a, m.local_cdb_ex)
+                return nil
+            }
+            expire = m.cache_no_entry_ex
+        } else if expire == -1 {
+            expire = makeExpire(m.default_ex, m.default_endex)
+        }
+
+        if e := m.cdb.Set(query, a, expire); e != nil {
+            return zerrors.WithMessagef(e, "缓存失败<%s>", query.FullPath())
+        }
+        _ = m.local_cdb.Set(query, a, m.local_cdb_ex)
+        return nil
+    })
+}
+
 // 为一个函数添加ctx
 func doFnWithContext(ctx context.Context, fn func() error) (err error) {
     if ctx == nil || ctx == context.Background() || ctx == context.TODO() {
