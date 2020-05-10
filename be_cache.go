@@ -164,12 +164,14 @@ func (m *BECache) cacheSet(query *Query, a interface{}, loader ILoader) {
     }
 }
 func (m *BECache) cacheDel(query *Query) error {
+    err := m.cdb.Del(query)
     _ = m.local_cdb.Del(query)
-    return m.cdb.Del(query)
+    return err
 }
 func (m *BECache) cacheDelSpace(space string) error {
+    err := m.cdb.DelSpaceData(space)
     _ = m.local_cdb.DelSpaceData(space)
-    return m.cdb.DelSpaceData(space)
+    return err
 }
 
 // 从db加载
